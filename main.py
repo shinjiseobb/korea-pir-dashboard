@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, Request, status, Query
+from fastapi import FastAPI, Request, status, Query, UploadFile, File
 from fastapi.responses import JSONResponse, FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -33,8 +33,10 @@ if sys.stdout and hasattr(sys.stdout, "reconfigure"):
 BASE_DIR = Path(__file__).resolve().parent
 LOGS_DIR = BASE_DIR / "logs"
 STATIC_DIR = BASE_DIR / "static"
+DATA_RAW_DIR = BASE_DIR / "data" / "raw"
 LOGS_DIR.mkdir(parents=True, exist_ok=True)
 STATIC_DIR.mkdir(parents=True, exist_ok=True)
+DATA_RAW_DIR.mkdir(parents=True, exist_ok=True)
 
 # 1. 환경변수 로드
 load_dotenv(BASE_DIR / ".env")
@@ -137,6 +139,60 @@ class RegionCompareRequest(BaseModel):
     )
 
 # 7. API 엔드포인트 구현
+
+@app.post("/api/upload", tags=["데이터 업로드"])
+async def upload_multiple_files(files: List[UploadFile] = File(...)):
+    """
+    여러 개의 원천 데이터 파일(CSV, Excel)을 안전하게 업로드하여 data/raw/ 에 격리 보관
+    - 보안 검증: 확장자 화이트리스트(.csv, .xlsx, .xls) 및 Path Traversal 방어
+    """
+    ALLOWED_EXTENSIONS = {".csv", ".xlsx", ".xls"}
+    MAX_FILE_SIZE = 25 * 1024 * 1024  # 파일당 최대 25MB
+
+    uploaded_results = []
+    errors = []
+
+    for file in files:
+        # 1. 파일명 추출 및 Path Traversal 방어
+        raw_name = file.filename or "unknown_file"
+        safe_name = Path(raw_name).name
+        ext = Path(safe_name).suffix.lower()
+
+        # 2. 확장자 화이트리스트 검증
+        if ext not in ALLOWED_EXTENSIONS:
+            errors.append(f"'{safe_name}': 지원하지 않는 파일 형식입니다. (CSV 및 Excel 파일만 허용)")
+            continue
+
+        # 3. 파일 내용 읽기 및 크기 검증
+        content = await file.read()
+        file_size = len(content)
+
+        if file_size > MAX_FILE_SIZE:
+            errors.append(f"'{safe_name}': 파일 크기 초과 (최대 25MB 이하만 가능)")
+            continue
+
+        if file_size == 0:
+            errors.append(f"'{safe_name}': 빈 파일(0 Bytes)은 업로드할 수 없습니다.")
+            continue
+
+        # 4. data/raw/ 폴더에 안전하게 저장
+        dest_path = DATA_RAW_DIR / safe_name
+        dest_path.write_bytes(content)
+
+        logger.info(f"📁 파일 업로드 성공: {safe_name} ({file_size:,} Bytes) -> data/raw/")
+        uploaded_results.append({
+            "filename": safe_name,
+            "size_bytes": file_size,
+            "size_formatted": f"{round(file_size / 1024, 1):,} KB",
+            "saved_path": f"data/raw/{safe_name}"
+        })
+
+    return {
+        "success": len(uploaded_results) > 0,
+        "uploaded_count": len(uploaded_results),
+        "uploaded_files": uploaded_results,
+        "errors": errors
+    }
 
 @app.get("/api/health", tags=["시스템"])
 def health_check():

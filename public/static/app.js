@@ -484,4 +484,158 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // 최초 로드 실행
   loadInitialData();
+
+  // 11. 다중 파일 업로드 로직
+  const dropZone = document.getElementById("dropZone");
+  const fileInput = document.getElementById("fileInput");
+  const btnBrowseFiles = document.getElementById("btnBrowseFiles");
+  const selectedFilesArea = document.getElementById("selectedFilesArea");
+  const selectedFilesCount = document.getElementById("selectedFilesCount");
+  const fileChipsList = document.getElementById("fileChipsList");
+  const btnClearFiles = document.getElementById("btnClearFiles");
+  const btnUploadFiles = document.getElementById("btnUploadFiles");
+  const uploadStatusMsg = document.getElementById("uploadStatusMsg");
+
+  let queuedFiles = [];
+
+  function updateFileListUI() {
+    while (fileChipsList.firstChild) {
+      fileChipsList.removeChild(fileChipsList.firstChild);
+    }
+
+    if (queuedFiles.length === 0) {
+      selectedFilesArea.style.display = "none";
+      return;
+    }
+
+    selectedFilesArea.style.display = "flex";
+    selectedFilesCount.textContent = String(queuedFiles.length);
+
+    queuedFiles.forEach((file, idx) => {
+      const itemCard = document.createElement("div");
+      itemCard.className = "file-item-card";
+
+      const left = document.createElement("div");
+      const nameText = document.createElement("strong");
+      nameText.textContent = `📄 ${file.name} `;
+      const sizeText = document.createElement("span");
+      sizeText.className = "stat-desc";
+      sizeText.textContent = `(${roundFileSize(file.size)})`;
+      left.appendChild(nameText);
+      left.appendChild(sizeText);
+
+      const btnRemove = document.createElement("button");
+      btnRemove.type = "button";
+      btnRemove.className = "btn-remove-file";
+      btnRemove.textContent = "✕";
+      btnRemove.title = "목록에서 제거";
+      btnRemove.addEventListener("click", () => {
+        queuedFiles.splice(idx, 1);
+        updateFileListUI();
+      });
+
+      itemCard.appendChild(left);
+      itemCard.appendChild(btnRemove);
+      fileChipsList.appendChild(itemCard);
+    });
+  }
+
+  function roundFileSize(bytes) {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  function handleAddedFiles(fileList) {
+    const validExtensions = [".csv", ".xlsx", ".xls"];
+    for (let i = 0; i < fileList.length; i++) {
+      const f = fileList[i];
+      const ext = f.name.substring(f.name.lastIndexOf(".")).toLowerCase();
+      if (validExtensions.includes(ext)) {
+        // 중복 파일명 체크 후 추가
+        if (!queuedFiles.some(existing => existing.name === f.name)) {
+          queuedFiles.push(f);
+        }
+      } else {
+        alert(`'${f.name}' 은(는) 지원하지 않는 파일입니다. (CSV 및 Excel 파일만 가능)`);
+      }
+    }
+    updateFileListUI();
+  }
+
+  // 드래그 앤 드롭 이벤트
+  btnBrowseFiles.addEventListener("click", () => fileInput.click());
+  dropZone.addEventListener("click", (e) => {
+    if (e.target !== btnBrowseFiles) fileInput.click();
+  });
+
+  dropZone.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    dropZone.classList.add("dragover");
+  });
+
+  dropZone.addEventListener("dragleave", () => {
+    dropZone.classList.remove("dragover");
+  });
+
+  dropZone.addEventListener("drop", (e) => {
+    e.preventDefault();
+    dropZone.classList.remove("dragover");
+    if (e.dataTransfer && e.dataTransfer.files) {
+      handleAddedFiles(e.dataTransfer.files);
+    }
+  });
+
+  fileInput.addEventListener("change", (e) => {
+    if (e.target.files) {
+      handleAddedFiles(e.target.files);
+    }
+  });
+
+  btnClearFiles.addEventListener("click", () => {
+    queuedFiles = [];
+    fileInput.value = "";
+    updateFileListUI();
+  });
+
+  // 서버로 업로드 전송 (/api/upload)
+  btnUploadFiles.addEventListener("click", async () => {
+    if (queuedFiles.length === 0) return;
+
+    btnUploadFiles.disabled = true;
+    btnUploadFiles.textContent = "서버로 업로드 중...";
+    uploadStatusMsg.style.display = "none";
+
+    const formData = new FormData();
+    queuedFiles.forEach(file => {
+      formData.append("files", file);
+    });
+
+    try {
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: formData
+      });
+      const json = await res.json();
+
+      uploadStatusMsg.style.display = "block";
+      if (json.success) {
+        uploadStatusMsg.className = "upload-status-msg success";
+        uploadStatusMsg.textContent = `🎉 파일 ${json.uploaded_count}개가 data/raw/ 폴더에 안전하게 업로드 완료되었습니다! (${json.uploaded_files.map(f => f.filename).join(", ")})`;
+        queuedFiles = [];
+        fileInput.value = "";
+        updateFileListUI();
+      } else {
+        uploadStatusMsg.className = "upload-status-msg error";
+        uploadStatusMsg.textContent = `❌ 업로드 실패: ${json.errors ? json.errors.join(" | ") : "오류가 발생했습니다."}`;
+      }
+    } catch (err) {
+      uploadStatusMsg.style.display = "block";
+      uploadStatusMsg.className = "upload-status-msg error";
+      uploadStatusMsg.textContent = `❌ 네트워크 오류가 발생했습니다: ${err.message}`;
+    } finally {
+      btnUploadFiles.disabled = false;
+      btnUploadFiles.textContent = "선택한 파일 서버로 업로드 전송하기";
+    }
+  });
 });

@@ -279,6 +279,128 @@ body {
   box-shadow: 0 2px 4px rgba(37, 99, 235, 0.25);
 }
 
+/* 📂 다중 파일 업로드 존 스타일 */
+.upload-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.drop-zone {
+  border: 2px dashed #94a3b8;
+  border-radius: var(--radius-lg);
+  padding: 2.25rem 1.5rem;
+  text-align: center;
+  background: #f8fafc;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.drop-zone:hover, .drop-zone.dragover {
+  border-color: var(--primary);
+  background: var(--primary-light);
+  transform: translateY(-2px);
+}
+
+.drop-zone-icon {
+  font-size: 2.8rem;
+}
+
+.drop-zone-text {
+  font-size: 1rem;
+  color: var(--text-main);
+}
+
+.drop-zone-subtext {
+  font-size: 0.825rem;
+  color: var(--text-muted);
+}
+
+.file-input-hidden {
+  display: none;
+}
+
+.selected-files-area {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  background: #f8fafc;
+  padding: 1.25rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+}
+
+.selected-files-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.file-chips-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.file-item-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.6rem 0.9rem;
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.85rem;
+}
+
+.btn-remove-file {
+  background: none;
+  border: none;
+  color: var(--danger);
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 0.95rem;
+  padding: 0.2rem 0.5rem;
+}
+
+.btn-danger-outline {
+  background: transparent;
+  border: 1px solid #fecaca;
+  color: var(--danger);
+  font-size: 0.775rem;
+  padding: 0.3rem 0.6rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.btn-danger-outline:hover {
+  background: var(--danger-light);
+}
+
+.upload-status-msg {
+  padding: 0.85rem 1.25rem;
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.5;
+}
+.upload-status-msg.success {
+  background: var(--success-light);
+  color: var(--success);
+  border: 1px solid #a7f3d0;
+}
+.upload-status-msg.error {
+  background: var(--danger-light);
+  color: var(--danger);
+  border: 1px solid #fecaca;
+}
+
 /* 2. 차트 섹션 */
 .chart-section {
   display: flex;

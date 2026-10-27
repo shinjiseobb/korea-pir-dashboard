@@ -78,6 +78,41 @@
       </div>
     </section>
 
+    <!-- 📂 원천 데이터 다중 파일 업로드 섹션 -->
+    <section class="card upload-section">
+      <div class="section-header">
+        <div>
+          <h2>📂 원천 데이터 파일 직접 업로드 (다중 파일 지원)</h2>
+          <p class="section-desc">새로운 소득 통계(Excel)나 부동산 실거래/평균매매가(CSV) 파일을 여러 개 드래그하여 업로드할 수 있습니다.</p>
+        </div>
+        <span class="badge-tag badge-easy">CSV 및 Excel(.xlsx) 지원</span>
+      </div>
+
+      <!-- 드래그 & 드롭 업로드 존 -->
+      <div class="drop-zone" id="dropZone">
+        <div class="drop-zone-icon">📁</div>
+        <p class="drop-zone-text"><strong>파일들을 이곳에 드래그하여 놓으세요</strong></p>
+        <p class="drop-zone-subtext">또는 아래 버튼을 눌러 컴퓨터에서 여러 파일을 한 번에 선택하세요</p>
+        <input type="file" id="fileInput" multiple accept=".csv, .xlsx, .xls" class="file-input-hidden">
+        <button type="button" class="btn btn-outline" id="btnBrowseFiles">내 컴퓨터에서 파일 선택 (다중)</button>
+      </div>
+
+      <!-- 선택된 파일 목록 -->
+      <div class="selected-files-area" id="selectedFilesArea" style="display: none;">
+        <div class="selected-files-header">
+          <span class="stat-label">선택된 파일 목록 (<span id="selectedFilesCount">0</span>개)</span>
+          <button type="button" class="btn btn-danger-outline" id="btnClearFiles">전체 비우기</button>
+        </div>
+        <div class="file-chips-list" id="fileChipsList">
+          <!-- 자바스크립트로 파일 리스트 안전하게 렌더링 -->
+        </div>
+        <button type="button" class="btn btn-primary btn-block" id="btnUploadFiles">선택한 파일 서버로 업로드 전송하기</button>
+      </div>
+
+      <!-- 업로드 결과 알림 메시지 -->
+      <div id="uploadStatusMsg" class="upload-status-msg" style="display: none;"></div>
+    </section>
+
     <!-- 2. 시각화 차트 섹션 -->
     <section class="card chart-section">
       <div class="section-header">
