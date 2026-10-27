@@ -34,9 +34,14 @@ BASE_DIR = Path(__file__).resolve().parent
 LOGS_DIR = BASE_DIR / "logs"
 STATIC_DIR = BASE_DIR / "static"
 DATA_RAW_DIR = BASE_DIR / "data" / "raw"
-LOGS_DIR.mkdir(parents=True, exist_ok=True)
-STATIC_DIR.mkdir(parents=True, exist_ok=True)
-DATA_RAW_DIR.mkdir(parents=True, exist_ok=True)
+
+# Vercel 등 읽기 전용(Read-Only) 서버리스 환경 고려한 안전한 디렉터리 생성
+try:
+    LOGS_DIR.mkdir(parents=True, exist_ok=True)
+    STATIC_DIR.mkdir(parents=True, exist_ok=True)
+    DATA_RAW_DIR.mkdir(parents=True, exist_ok=True)
+except (OSError, PermissionError):
+    pass
 
 # 1. 환경변수 로드
 load_dotenv(BASE_DIR / ".env")
@@ -45,22 +50,25 @@ PORT = int(os.getenv("PORT", 8000))
 ALLOWED_ORIGINS_RAW = os.getenv("ALLOWED_ORIGINS", "http://localhost:8000,http://127.0.0.1:8000")
 ALLOWED_ORIGINS = [origin.strip() for origin in ALLOWED_ORIGINS_RAW.split(",") if origin.strip()]
 
-# 2. 로깅 설정 (콘솔 + logs/backend.log)
+# 2. 로깅 설정 (콘솔 필수 + 로컬 파일 선택)
 logger = logging.getLogger("BackendServer")
 logger.setLevel(logging.INFO)
 logger.handlers.clear()
 
 formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
 
-# 콘솔 출력
+# 콘솔 출력 (Vercel에서는 콘솔 출력이 런타임 로그로 완벽히 자동 캡처됨)
 ch = logging.StreamHandler(sys.stdout)
 ch.setFormatter(formatter)
 logger.addHandler(ch)
 
-# 파일 출력 (logs/backend.log)
-fh = logging.FileHandler(LOGS_DIR / "backend.log", encoding="utf-8")
-fh.setFormatter(formatter)
-logger.addHandler(fh)
+# 파일 출력 (로컬 환경에서만 안전하게 시도하고, Vercel 읽기전용 환경에서는 조용히 통과)
+try:
+    fh = logging.FileHandler(LOGS_DIR / "backend.log", encoding="utf-8")
+    fh.setFormatter(formatter)
+    logger.addHandler(fh)
+except (OSError, PermissionError):
+    pass
 
 # 3. FastAPI 인스턴스 생성
 app = FastAPI(
@@ -175,16 +183,24 @@ async def upload_multiple_files(files: List[UploadFile] = File(...)):
             errors.append(f"'{safe_name}': 빈 파일(0 Bytes)은 업로드할 수 없습니다.")
             continue
 
-        # 4. data/raw/ 폴더에 안전하게 저장
-        dest_path = DATA_RAW_DIR / safe_name
-        dest_path.write_bytes(content)
+        # 4. 파일 저장 (로컬은 data/raw, Vercel 읽기전용 서버리스는 /tmp 로 안전 저장)
+        try:
+            DATA_RAW_DIR.mkdir(parents=True, exist_ok=True)
+            dest_path = DATA_RAW_DIR / safe_name
+            dest_path.write_bytes(content)
+            saved_label = f"data/raw/{safe_name}"
+        except (OSError, PermissionError):
+            import tempfile
+            dest_path = Path(tempfile.gettempdir()) / safe_name
+            dest_path.write_bytes(content)
+            saved_label = f"temp/{safe_name}"
 
-        logger.info(f"📁 파일 업로드 성공: {safe_name} ({file_size:,} Bytes) -> data/raw/")
+        logger.info(f"📁 파일 업로드 성공: {safe_name} ({file_size:,} Bytes) -> {saved_label}")
         uploaded_results.append({
             "filename": safe_name,
             "size_bytes": file_size,
             "size_formatted": f"{round(file_size / 1024, 1):,} KB",
-            "saved_path": f"data/raw/{safe_name}"
+            "saved_path": saved_label
         })
 
     return {

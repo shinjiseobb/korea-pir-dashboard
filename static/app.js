@@ -45,6 +45,9 @@ document.addEventListener("DOMContentLoaded", () => {
   async function loadInitialData() {
     try {
       const res = await fetch("/api/pir");
+      if (!res.ok) {
+        throw new Error(`HTTP 상태 코드 ${res.status}`);
+      }
       const json = await res.json();
       if (json.success && Array.isArray(json.data)) {
         pirDataList = json.data;
@@ -54,7 +57,7 @@ document.addEventListener("DOMContentLoaded", () => {
         runBudgetCalculator();
       }
     } catch (err) {
-      console.error("데이터 로드 실패:", err);
+      console.warn("데이터 로드 일시 지연 또는 오류:", err.message);
     }
   }
 
