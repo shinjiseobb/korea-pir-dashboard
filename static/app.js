@@ -3,6 +3,7 @@
  * 보안 원칙 준수:
  * - innerHTML 사용 전면 금지 (XSS 원천 차단)
  * - document.createElement 및 textContent 안전한 DOM 바인딩만 사용
+ * - 권역별 / 17개 시·도별 / 전체 분류 동적 필터링 지원
  */
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -10,6 +11,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let pirDataList = [];
   let chartInstance = null;
   let currentSortAscending = false;
+  let currentLevelFilter = "all"; // 'all', '시도', '권역'
 
   // DOM 요소 참조
   const statNationalPir = document.getElementById("statNationalPir");
@@ -18,6 +20,11 @@ document.addEventListener("DOMContentLoaded", () => {
   const statLowestRegion = document.getElementById("statLowestRegion");
   const statLowestValue = document.getElementById("statLowestValue");
   const statRegionCount = document.getElementById("statRegionCount");
+
+  const levelButtonGroup = document.getElementById("levelButtonGroup");
+  const chartTitle = document.getElementById("chartTitle");
+  const chartDesc = document.getElementById("chartDesc");
+  const tableTitle = document.getElementById("tableTitle");
 
   const btnSortPirDesc = document.getElementById("btnSortPirDesc");
   const btnSortPirAsc = document.getElementById("btnSortPirAsc");
@@ -42,10 +49,8 @@ document.addEventListener("DOMContentLoaded", () => {
       if (json.success && Array.isArray(json.data)) {
         pirDataList = json.data;
         updateSummaryCards(pirDataList);
-        renderChart(pirDataList);
-        renderTable(pirDataList);
+        refreshViews();
         initRegionChips(pirDataList);
-        // 기본 계산기 1회 자동 실행 (연봉 5000만원 기준)
         runBudgetCalculator();
       }
     } catch (err) {
@@ -53,7 +58,38 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // 2. 핵심 요약 카드 업데이트 (textContent 안전 바인딩)
+  // 2. 현재 선택된 분류(시도/권역/전체)에 맞춰 데이터 필터링
+  function getFilteredByLevel() {
+    if (currentLevelFilter === "all") {
+      return pirDataList;
+    }
+    return pirDataList.filter(r => r.level === currentLevelFilter || r.region_name === "전국");
+  }
+
+  // 3. 차트 & 테이블 화면 일괄 갱신
+  function refreshViews() {
+    const data = getFilteredByLevel();
+
+    // 타이틀 문구 갱신
+    if (currentLevelFilter === "시도") {
+      chartTitle.textContent = "📊 17개 광역 시·도별 PIR 순위 비교";
+      chartDesc.textContent = "전국 17개 광역시·도(서울, 경기, 부산 등) 간 소득 대비 집값 비교";
+      tableTitle.textContent = "📋 17개 시·도별 정밀 PIR 통계표";
+    } else if (currentLevelFilter === "권역") {
+      chartTitle.textContent = "🧭 서울 5대 권역별 PIR 순위 비교";
+      chartDesc.textContent = "서울 도심권, 동남권(강남4구), 동북권, 서남권, 서북권 간 소득 대비 집값 비교";
+      tableTitle.textContent = "📋 서울 5대 권역별 정밀 PIR 통계표";
+    } else {
+      chartTitle.textContent = "📊 전체 지역(시·도 및 서울 권역) PIR 순위 비교";
+      chartDesc.textContent = "연간 소득을 한 푼도 쓰지 않고 모았을 때 집을 사는 데 걸리는 햇수(년)";
+      tableTitle.textContent = "📋 전국 행정구역별 정밀 PIR 통계표";
+    }
+
+    renderChart(data);
+    renderTable(data, tableSearchInput.value.trim());
+  }
+
+  // 4. 핵심 요약 카드 업데이트 (textContent 안전 바인딩)
   function updateSummaryCards(data) {
     const national = data.find(r => r.region_name === "전국");
     const nonNational = data.filter(r => r.region_name !== "전국");
@@ -76,7 +112,7 @@ document.addEventListener("DOMContentLoaded", () => {
     statRegionCount.textContent = `${nonNational.length}개 지역`;
   }
 
-  // 3. Chart.js 막대 차트 렌더링
+  // 5. Chart.js 막대 차트 렌더링
   function renderChart(data) {
     const ctx = document.getElementById("pirChart").getContext("2d");
     const sorted = [...data].filter(r => r.region_name !== "전국");
@@ -90,9 +126,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const labels = sorted.map(r => r.region_name);
     const pirValues = sorted.map(r => r.pir);
     const backgroundColors = sorted.map(r => {
-      if (r.region_name.includes("서울")) return "rgba(220, 38, 38, 0.75)";  // 빨간색 계열
-      if (r.region_name.includes("경기") || r.region_name.includes("세종")) return "rgba(37, 99, 235, 0.75)"; // 파란색 계열
-      return "rgba(100, 116, 139, 0.65)"; // 슬레이트 그레이
+      if (r.level === "권역") return "rgba(220, 38, 38, 0.75)";  // 권역: 빨간색
+      if (r.region_name.includes("경기") || r.region_name.includes("세종")) return "rgba(37, 99, 235, 0.75)"; // 수도권/세종: 파란색
+      return "rgba(100, 116, 139, 0.65)"; // 일반 시도: 슬레이트 그레이
     });
 
     if (chartInstance) {
@@ -121,6 +157,7 @@ document.addEventListener("DOMContentLoaded", () => {
               label: function(context) {
                 const item = sorted[context.dataIndex];
                 return [
+                  ` 구분: ${item.level}`,
                   ` PIR: ${item.pir}배 (전국 ${item.pir_vs_national}배)`,
                   ` 평균 주택가격: ${item.housing_price_manwon.toLocaleString()}만 원`,
                   ` 1인당 평균연소득: ${item.annual_income_manwon.toLocaleString()}만 원`
@@ -146,7 +183,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // 4. 데이터 테이블 렌더링 (안전한 DOM 생성)
+  // 6. 데이터 테이블 렌더링 (안전한 DOM 생성)
   function renderTable(data, filterKeyword = "") {
     while (tableBody.firstChild) {
       tableBody.removeChild(tableBody.firstChild);
@@ -157,18 +194,23 @@ document.addEventListener("DOMContentLoaded", () => {
       return r.region_name.toLowerCase().includes(filterKeyword.toLowerCase());
     });
 
-    filtered.forEach(row => {
+    filtered.forEach((row, index) => {
       const tr = document.createElement("tr");
 
       // 순위 td
       const tdRank = document.createElement("td");
       const spanRank = document.createElement("span");
       spanRank.className = "rank-badge";
-      if (row.rank === 1) spanRank.classList.add("rank-1");
-      else if (row.rank === 2) spanRank.classList.add("rank-2");
-      else if (row.rank === 3) spanRank.classList.add("rank-3");
-      else spanRank.classList.add("rank-other");
-      spanRank.textContent = row.rank === 0 ? "-" : String(row.rank);
+      if (row.region_name === "전국") {
+        spanRank.textContent = "-";
+        spanRank.classList.add("rank-other");
+      } else {
+        spanRank.textContent = String(row.rank || index + 1);
+        if (row.rank === 1) spanRank.classList.add("rank-1");
+        else if (row.rank === 2) spanRank.classList.add("rank-2");
+        else if (row.rank === 3) spanRank.classList.add("rank-3");
+        else spanRank.classList.add("rank-other");
+      }
       tdRank.appendChild(spanRank);
       tr.appendChild(tdRank);
 
@@ -179,9 +221,15 @@ document.addEventListener("DOMContentLoaded", () => {
       tdName.appendChild(strongName);
       tr.appendChild(tdName);
 
-      // 구분 td
+      // 구분 td (뱃지 스타일)
       const tdLevel = document.createElement("td");
-      tdLevel.textContent = row.level;
+      const badgeLevel = document.createElement("span");
+      badgeLevel.className = "badge-tag";
+      if (row.level === "권역") badgeLevel.classList.add("badge-hard");
+      else if (row.level === "시도") badgeLevel.classList.add("badge-easy");
+      else badgeLevel.classList.add("badge-medium");
+      badgeLevel.textContent = row.level;
+      tdLevel.appendChild(badgeLevel);
       tr.appendChild(tdLevel);
 
       // 주택가격 td
@@ -214,7 +262,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // 5. 내 연소득 맞춤 계산기 실행 (/api/filter)
+  // 7. 내 연소득 맞춤 계산기 실행 (/api/filter)
   async function runBudgetCalculator() {
     const incomeManwon = parseFloat(inputIncome.value);
     if (!incomeManwon || incomeManwon <= 0) return;
@@ -252,7 +300,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
           const leftDiv = document.createElement("div");
           const nameSpan = document.createElement("strong");
-          nameSpan.textContent = item.region_name;
+          nameSpan.textContent = `${item.region_name} (${item.level})`;
           const infoSpan = document.createElement("div");
           infoSpan.className = "stat-desc";
           infoSpan.textContent = `평균 집값: ${item.housing_price_manwon.toLocaleString()}만 원`;
@@ -285,13 +333,13 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // 6. 지역 비교용 체크박스 칩 생성
+  // 8. 지역 비교용 체크박스 칩 생성
   function initRegionChips(data) {
     while (regionChipsContainer.firstChild) {
       regionChipsContainer.removeChild(regionChipsContainer.firstChild);
     }
 
-    const defaultSelected = ["서울특별시", "경기도", "부산광역시"];
+    const defaultSelected = ["서울특별시", "경기도", "부산광역시", "서울 동남권"];
     const nonNational = data.filter(r => r.region_name !== "전국");
 
     nonNational.forEach(item => {
@@ -305,17 +353,16 @@ document.addEventListener("DOMContentLoaded", () => {
         chk.checked = true;
       }
 
-      const text = document.createTextNode(` ${item.region_name}`);
+      const text = document.createTextNode(` ${item.region_name} [${item.level}]`);
       label.appendChild(chk);
       label.appendChild(text);
       regionChipsContainer.appendChild(label);
     });
 
-    // 기본 비교 1회 실행
     runCompareSelectedRegions();
   }
 
-  // 7. 지역 맞비교 실행 (/api/compare)
+  // 9. 지역 맞비교 실행 (/api/compare)
   async function runCompareSelectedRegions() {
     const checkedBoxes = regionChipsContainer.querySelectorAll("input[type='checkbox']:checked");
     const selected = Array.from(checkedBoxes).map(cb => cb.value);
@@ -368,7 +415,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
           const left = document.createElement("div");
           const rTitle = document.createElement("strong");
-          rTitle.textContent = reg.region_name;
+          rTitle.textContent = `${reg.region_name} [${reg.level}]`;
           const rSub = document.createElement("div");
           rSub.className = "stat-desc";
           rSub.textContent = `집값: ${reg.housing_price_manwon.toLocaleString()}만원 / 소득: ${reg.annual_income_manwon.toLocaleString()}만원`;
@@ -395,19 +442,31 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // 이벤트 바인딩
+  // 10. 분류 선택 버튼 이벤트 바인딩 (전체 / 시도 / 권역)
+  levelButtonGroup.addEventListener("click", (e) => {
+    const btn = e.target.closest(".btn-filter");
+    if (!btn) return;
+
+    levelButtonGroup.querySelectorAll(".btn-filter").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+
+    currentLevelFilter = btn.dataset.level;
+    refreshViews();
+  });
+
+  // 정렬 및 폼 이벤트 바인딩
   btnSortPirDesc.addEventListener("click", () => {
     currentSortAscending = false;
     btnSortPirDesc.classList.add("active");
     btnSortPirAsc.classList.remove("active");
-    renderChart(pirDataList);
+    refreshViews();
   });
 
   btnSortPirAsc.addEventListener("click", () => {
     currentSortAscending = true;
     btnSortPirAsc.classList.add("active");
     btnSortPirDesc.classList.remove("active");
-    renderChart(pirDataList);
+    refreshViews();
   });
 
   calculatorForm.addEventListener("submit", (e) => {
@@ -420,7 +479,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   tableSearchInput.addEventListener("input", (e) => {
-    renderTable(pirDataList, e.target.value.trim());
+    renderTable(getFilteredByLevel(), e.target.value.trim());
   });
 
   // 최초 로드 실행

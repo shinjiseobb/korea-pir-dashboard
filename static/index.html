@@ -68,12 +68,22 @@
       </div>
     </section>
 
+    <!-- 🌟 권역별 / 시·도별 분류 선택 필터 바 -->
+    <section class="classification-filter-bar">
+      <span class="filter-bar-label">🔍 행정구역 분류 선택:</span>
+      <div class="level-btn-group" id="levelButtonGroup">
+        <button class="btn btn-filter active" data-level="all">🌐 전체 보기 (전국·시도·권역)</button>
+        <button class="btn btn-filter" data-level="시도">🏙️ 17개 시·도별 보기</button>
+        <button class="btn btn-filter" data-level="권역">🧭 서울 5대 권역별 보기</button>
+      </div>
+    </section>
+
     <!-- 2. 시각화 차트 섹션 -->
     <section class="card chart-section">
       <div class="section-header">
         <div>
-          <h2>📊 지역별 주택가격 대비 소득 배수 (PIR) 순위</h2>
-          <p class="section-desc">연간 소득을 한 푼도 쓰지 않고 모았을 때 집을 사는 데 걸리는 햇수(년)</p>
+          <h2 id="chartTitle">📊 지역별 주택가격 대비 소득 배수 (PIR) 순위</h2>
+          <p class="section-desc" id="chartDesc">연간 소득을 한 푼도 쓰지 않고 모았을 때 집을 사는 데 걸리는 햇수(년)</p>
         </div>
         <div class="filter-controls">
           <button class="btn btn-outline active" id="btnSortPirDesc">PIR 높은순</button>
@@ -138,8 +148,8 @@
     <section class="card table-section">
       <div class="section-header">
         <div>
-          <h2>📋 전국 행정구역별 정밀 PIR 통계표</h2>
-          <p class="section-desc">전체 23개 분석 지역의 정제된 원천 지표 및 전국 대비 배수</p>
+          <h2 id="tableTitle">📋 전국 행정구역별 정밀 PIR 통계표</h2>
+          <p class="section-desc">분석 지역의 정제된 원천 지표 및 전국 대비 배수</p>
         </div>
         <div class="search-box">
           <input type="text" id="tableSearchInput" placeholder="지역명 검색 (예: 서울, 경기...)">

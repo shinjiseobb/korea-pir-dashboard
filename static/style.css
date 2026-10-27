@@ -231,6 +231,54 @@ body {
 .text-info { color: var(--info); }
 .text-right { text-align: right; }
 
+/* 🌟 권역별 / 시·도별 분류 필터 바 */
+.classification-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background: #ffffff;
+  padding: 1rem 1.25rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  flex-wrap: wrap;
+}
+
+.filter-bar-label {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: #334155;
+}
+
+.level-btn-group {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.btn-filter {
+  background: #f8fafc;
+  border: 1px solid var(--border);
+  color: var(--text-main);
+  padding: 0.55rem 1rem;
+  font-size: 0.85rem;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-filter:hover {
+  background: #e2e8f0;
+}
+
+.btn-filter.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #ffffff;
+  box-shadow: 0 2px 4px rgba(37, 99, 235, 0.25);
+}
+
 /* 2. 차트 섹션 */
 .chart-section {
   display: flex;
