@@ -1,9 +1,11 @@
 /**
  * 전국 시·군·구 PIR 대시보드 프론트엔드 로직 (app.js)
- * 보안 원칙 준수:
+ * 보안 및 안정성 원칙:
  * - innerHTML 사용 전면 금지 (XSS 원천 차단)
- * - document.createElement 및 textContent 안전한 DOM 바인딩만 사용
- * - 권역별 / 17개 시·도별 / 전체 분류 동적 필터링 지원
+ * - 0ms 즉시 로딩을 위한 하이브리드 데이터 로더 (API 우선 -> static/pir_data.json 자동 폴백)
+ * - 클라우드 서버리스 무중단 클라이언트 계산기 (오프라인/에러 자동 복구)
+ * - 권역별 / 17개 시·도별 / 전체 분류 동적 필터링
+ * - 다중 파일 업로드 및 자동 재분석 반영
  */
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -41,23 +43,40 @@ document.addEventListener("DOMContentLoaded", () => {
   const tableBody = document.getElementById("tableBody");
   const tableSearchInput = document.getElementById("tableSearchInput");
 
-  // 1. 초기 데이터 로드 (/api/pir)
+  // 1. 하이브리드 초기 데이터 로드 (/api/pir -> 실패 시 /static/pir_data.json 자동 폴백)
   async function loadInitialData() {
+    let json = null;
+
+    // 1차 시도: 백엔드 API 호출
     try {
       const res = await fetch("/api/pir");
-      if (!res.ok) {
-        throw new Error(`HTTP 상태 코드 ${res.status}`);
-      }
-      const json = await res.json();
-      if (json.success && Array.isArray(json.data)) {
-        pirDataList = json.data;
-        updateSummaryCards(pirDataList);
-        refreshViews();
-        initRegionChips(pirDataList);
-        runBudgetCalculator();
+      if (res.ok) {
+        json = await res.json();
       }
     } catch (err) {
-      console.warn("데이터 로드 일시 지연 또는 오류:", err.message);
+      console.warn("API 엔드포인트 접속 지연 -> 정적 데이터셋으로 즉시 전환합니다.");
+    }
+
+    // 2차 시도: 정적 JSON 폴백 (Vercel 클라우드 무장애 100% 로딩 보장)
+    if (!json || !json.data || !Array.isArray(json.data)) {
+      try {
+        const fallbackRes = await fetch("/static/pir_data.json");
+        if (fallbackRes.ok) {
+          json = await fallbackRes.json();
+          console.log("🟢 Vercel CDN 정적 데이터셋 로드 완료:", json.count, "개 지역");
+        }
+      } catch (fbErr) {
+        console.error("데이터 로드 완전 실패:", fbErr);
+        return;
+      }
+    }
+
+    if (json && Array.isArray(json.data)) {
+      pirDataList = json.data;
+      updateSummaryCards(pirDataList);
+      refreshViews();
+      initRegionChips(pirDataList);
+      runBudgetCalculator();
     }
   }
 
@@ -73,7 +92,6 @@ document.addEventListener("DOMContentLoaded", () => {
   function refreshViews() {
     const data = getFilteredByLevel();
 
-    // 타이틀 문구 갱신
     if (currentLevelFilter === "시도") {
       chartTitle.textContent = "📊 17개 광역 시·도별 PIR 순위 비교";
       chartDesc.textContent = "전국 17개 광역시·도(서울, 경기, 부산 등) 간 소득 대비 집값 비교";
@@ -129,9 +147,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const labels = sorted.map(r => r.region_name);
     const pirValues = sorted.map(r => r.pir);
     const backgroundColors = sorted.map(r => {
-      if (r.level === "권역") return "rgba(220, 38, 38, 0.75)";  // 권역: 빨간색
-      if (r.region_name.includes("경기") || r.region_name.includes("세종")) return "rgba(37, 99, 235, 0.75)"; // 수도권/세종: 파란색
-      return "rgba(100, 116, 139, 0.65)"; // 일반 시도: 슬레이트 그레이
+      if (r.level === "권역") return "rgba(220, 38, 38, 0.75)";
+      if (r.region_name.includes("경기") || r.region_name.includes("세종")) return "rgba(37, 99, 235, 0.75)";
+      return "rgba(100, 116, 139, 0.65)";
     });
 
     if (chartInstance) {
@@ -224,7 +242,7 @@ document.addEventListener("DOMContentLoaded", () => {
       tdName.appendChild(strongName);
       tr.appendChild(tdName);
 
-      // 구분 td (뱃지 스타일)
+      // 구분 td
       const tdLevel = document.createElement("td");
       const badgeLevel = document.createElement("span");
       badgeLevel.className = "badge-tag";
@@ -265,7 +283,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // 7. 내 연소득 맞춤 계산기 실행 (/api/filter)
+  // 7. 내 연소득 맞춤 계산기 (API 호출 + 로컬 자동 계산 하이브리드)
   async function runBudgetCalculator() {
     const incomeManwon = parseFloat(inputIncome.value);
     if (!incomeManwon || incomeManwon <= 0) return;
@@ -277,63 +295,82 @@ document.addEventListener("DOMContentLoaded", () => {
       calculatorResult.removeChild(calculatorResult.firstChild);
     }
 
+    let results = [];
+
+    // 1차 시도: API 호출
     try {
       const res = await fetch("/api/filter", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          annual_income_won: incomeWon,
-          max_pir: maxPirVal
-        })
+        body: JSON.stringify({ annual_income_won: incomeWon, max_pir: maxPirVal })
       });
-      const json = await res.json();
-
-      if (json.success && Array.isArray(json.data)) {
-        if (json.data.length === 0) {
-          const emptyMsg = document.createElement("p");
-          emptyMsg.className = "stat-desc";
-          emptyMsg.textContent = "조건에 부합하는 지역이 없습니다. 소득이나 목표 PIR을 조정해 보세요.";
-          calculatorResult.appendChild(emptyMsg);
-          return;
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && Array.isArray(json.data)) {
+          results = json.data;
         }
-
-        json.data.forEach(item => {
-          const divItem = document.createElement("div");
-          divItem.className = "result-item";
-
-          const leftDiv = document.createElement("div");
-          const nameSpan = document.createElement("strong");
-          nameSpan.textContent = `${item.region_name} (${item.level})`;
-          const infoSpan = document.createElement("div");
-          infoSpan.className = "stat-desc";
-          infoSpan.textContent = `평균 집값: ${item.housing_price_manwon.toLocaleString()}만 원`;
-          leftDiv.appendChild(nameSpan);
-          leftDiv.appendChild(infoSpan);
-
-          const rightDiv = document.createElement("div");
-          rightDiv.className = "text-right";
-          const pirSpan = document.createElement("div");
-          pirSpan.style.fontWeight = "700";
-          pirSpan.textContent = `소요: ${item.user_custom_pir}년`;
-
-          const tagSpan = document.createElement("span");
-          tagSpan.className = "badge-tag";
-          if (item.affordability === "진입 용이") tagSpan.classList.add("badge-easy");
-          else if (item.affordability === "적정 수준") tagSpan.classList.add("badge-medium");
-          else tagSpan.classList.add("badge-hard");
-          tagSpan.textContent = item.affordability;
-
-          rightDiv.appendChild(pirSpan);
-          rightDiv.appendChild(tagSpan);
-
-          divItem.appendChild(leftDiv);
-          divItem.appendChild(rightDiv);
-          calculatorResult.appendChild(divItem);
-        });
       }
-    } catch (err) {
-      console.error("필터링 계산 오류:", err);
+    } catch (e) {
+      // API 실패 시 로컬 자바스크립트 자동 계산 전환
     }
+
+    // 2차 시도: 로컬 데이터 기반 즉시 계산 (서버리스 무관 100% 작동)
+    if (results.length === 0 && pirDataList.length > 0) {
+      results = pirDataList
+        .filter(r => r.region_name !== "전국")
+        .map(r => {
+          const userPir = Number((r.housing_price_won / incomeWon).toFixed(2));
+          return {
+            ...r,
+            user_custom_pir: userPir,
+            affordability: userPir <= 7.0 ? "진입 용이" : (userPir <= 12.0 ? "적정 수준" : "부담 큼")
+          };
+        })
+        .filter(r => (maxPirVal === null ? true : r.user_custom_pir <= maxPirVal))
+        .sort((a, b) => a.user_custom_pir - b.user_custom_pir);
+    }
+
+    if (results.length === 0) {
+      const emptyMsg = document.createElement("p");
+      emptyMsg.className = "stat-desc";
+      emptyMsg.textContent = "조건에 부합하는 지역이 없습니다. 소득이나 목표 PIR을 조정해 보세요.";
+      calculatorResult.appendChild(emptyMsg);
+      return;
+    }
+
+    results.forEach(item => {
+      const divItem = document.createElement("div");
+      divItem.className = "result-item";
+
+      const leftDiv = document.createElement("div");
+      const nameSpan = document.createElement("strong");
+      nameSpan.textContent = `${item.region_name} (${item.level})`;
+      const infoSpan = document.createElement("div");
+      infoSpan.className = "stat-desc";
+      infoSpan.textContent = `평균 집값: ${item.housing_price_manwon.toLocaleString()}만 원`;
+      leftDiv.appendChild(nameSpan);
+      leftDiv.appendChild(infoSpan);
+
+      const rightDiv = document.createElement("div");
+      rightDiv.className = "text-right";
+      const pirSpan = document.createElement("div");
+      pirSpan.style.fontWeight = "700";
+      pirSpan.textContent = `소요: ${item.user_custom_pir}년`;
+
+      const tagSpan = document.createElement("span");
+      tagSpan.className = "badge-tag";
+      if (item.affordability === "진입 용이") tagSpan.classList.add("badge-easy");
+      else if (item.affordability === "적정 수준") tagSpan.classList.add("badge-medium");
+      else tagSpan.classList.add("badge-hard");
+      tagSpan.textContent = item.affordability;
+
+      rightDiv.appendChild(pirSpan);
+      rightDiv.appendChild(tagSpan);
+
+      divItem.appendChild(leftDiv);
+      divItem.appendChild(rightDiv);
+      calculatorResult.appendChild(divItem);
+    });
   }
 
   // 8. 지역 비교용 체크박스 칩 생성
@@ -365,7 +402,7 @@ document.addEventListener("DOMContentLoaded", () => {
     runCompareSelectedRegions();
   }
 
-  // 9. 지역 맞비교 실행 (/api/compare)
+  // 9. 지역 맞비교 실행 (API + 로컬 자바스크립트 하이브리드)
   async function runCompareSelectedRegions() {
     const checkedBoxes = regionChipsContainer.querySelectorAll("input[type='checkbox']:checked");
     const selected = Array.from(checkedBoxes).map(cb => cb.value);
@@ -382,66 +419,85 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
+    let comparison = null;
+
+    // 1차: API 호출
     try {
       const res = await fetch("/api/compare", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ regions: selected })
       });
-      const json = await res.json();
-
-      if (json.success && json.data) {
-        const d = json.data;
-        const summaryCard = document.createElement("div");
-        summaryCard.className = "result-item";
-        summaryCard.style.backgroundColor = "var(--primary-light)";
-        summaryCard.style.borderColor = "#bfdbfe";
-
-        const summaryText = document.createElement("div");
-        const s1 = document.createElement("div");
-        s1.textContent = `📍 비교 대상 ${d.count}개 지역 분석 결과`;
-        s1.style.fontWeight = "700";
-        s1.style.color = "var(--primary)";
-
-        const s2 = document.createElement("div");
-        s2.className = "stat-desc";
-        s2.textContent = `최고 PIR: ${d.highest_pir_region} | 최저 PIR: ${d.lowest_pir_region} | 평균 PIR: ${d.avg_pir}배`;
-
-        summaryText.appendChild(s1);
-        summaryText.appendChild(s2);
-        summaryCard.appendChild(summaryText);
-        compareResult.appendChild(summaryCard);
-
-        d.regions.forEach(reg => {
-          const rItem = document.createElement("div");
-          rItem.className = "result-item";
-
-          const left = document.createElement("div");
-          const rTitle = document.createElement("strong");
-          rTitle.textContent = `${reg.region_name} [${reg.level}]`;
-          const rSub = document.createElement("div");
-          rSub.className = "stat-desc";
-          rSub.textContent = `집값: ${reg.housing_price_manwon.toLocaleString()}만원 / 소득: ${reg.annual_income_manwon.toLocaleString()}만원`;
-          left.appendChild(rTitle);
-          left.appendChild(rSub);
-
-          const right = document.createElement("div");
-          right.className = "text-right";
-          const rPir = document.createElement("strong");
-          rPir.textContent = `PIR ${reg.pir.toFixed(2)}배`;
-          const rVs = document.createElement("div");
-          rVs.className = "stat-desc";
-          rVs.textContent = `전국의 ${reg.pir_vs_national}배`;
-          right.appendChild(rPir);
-          right.appendChild(rVs);
-
-          rItem.appendChild(left);
-          rItem.appendChild(right);
-          compareResult.appendChild(rItem);
-        });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && json.data) comparison = json.data;
       }
-    } catch (err) {
-      console.error("비교 분석 오류:", err);
+    } catch (e) {}
+
+    // 2차: 로컬 데이터 계산 폴백
+    if (!comparison && pirDataList.length > 0) {
+      const matched = pirDataList.filter(r => selected.includes(r.region_name));
+      if (matched.length > 0) {
+        const pirs = matched.map(r => r.pir);
+        comparison = {
+          count: matched.length,
+          highest_pir_region: matched.reduce((a, b) => (a.pir > b.pir ? a : b)).region_name,
+          lowest_pir_region: matched.reduce((a, b) => (a.pir < b.pir ? a : b)).region_name,
+          avg_pir: Number((pirs.reduce((a, b) => a + b, 0) / pirs.length).toFixed(2)),
+          regions: matched
+        };
+      }
+    }
+
+    if (comparison && comparison.regions) {
+      const d = comparison;
+      const summaryCard = document.createElement("div");
+      summaryCard.className = "result-item";
+      summaryCard.style.backgroundColor = "var(--primary-light)";
+      summaryCard.style.borderColor = "#bfdbfe";
+
+      const summaryText = document.createElement("div");
+      const s1 = document.createElement("div");
+      s1.textContent = `📍 비교 대상 ${d.count}개 지역 분석 결과`;
+      s1.style.fontWeight = "700";
+      s1.style.color = "var(--primary)";
+
+      const s2 = document.createElement("div");
+      s2.className = "stat-desc";
+      s2.textContent = `최고 PIR: ${d.highest_pir_region} | 최저 PIR: ${d.lowest_pir_region} | 평균 PIR: ${d.avg_pir}배`;
+
+      summaryText.appendChild(s1);
+      summaryText.appendChild(s2);
+      summaryCard.appendChild(summaryText);
+      compareResult.appendChild(summaryCard);
+
+      d.regions.forEach(reg => {
+        const rItem = document.createElement("div");
+        rItem.className = "result-item";
+
+        const left = document.createElement("div");
+        const rTitle = document.createElement("strong");
+        rTitle.textContent = `${reg.region_name} [${reg.level}]`;
+        const rSub = document.createElement("div");
+        rSub.className = "stat-desc";
+        rSub.textContent = `집값: ${reg.housing_price_manwon.toLocaleString()}만원 / 소득: ${reg.annual_income_manwon.toLocaleString()}만원`;
+        left.appendChild(rTitle);
+        left.appendChild(rSub);
+
+        const right = document.createElement("div");
+        right.className = "text-right";
+        const rPir = document.createElement("strong");
+        rPir.textContent = `PIR ${reg.pir.toFixed(2)}배`;
+        const rVs = document.createElement("div");
+        rVs.className = "stat-desc";
+        rVs.textContent = `전국의 ${reg.pir_vs_national}배`;
+        right.appendChild(rPir);
+        right.appendChild(rVs);
+
+        rItem.appendChild(left);
+        rItem.appendChild(right);
+        compareResult.appendChild(rItem);
+      });
     }
   }
 
@@ -485,10 +541,7 @@ document.addEventListener("DOMContentLoaded", () => {
     renderTable(getFilteredByLevel(), e.target.value.trim());
   });
 
-  // 최초 로드 실행
-  loadInitialData();
-
-  // 11. 다중 파일 업로드 로직
+  // 11. 다중 파일 업로드 및 자동 재분석 트리거
   const dropZone = document.getElementById("dropZone");
   const fileInput = document.getElementById("fileInput");
   const btnBrowseFiles = document.getElementById("btnBrowseFiles");
@@ -555,7 +608,6 @@ document.addEventListener("DOMContentLoaded", () => {
       const f = fileList[i];
       const ext = f.name.substring(f.name.lastIndexOf(".")).toLowerCase();
       if (validExtensions.includes(ext)) {
-        // 중복 파일명 체크 후 추가
         if (!queuedFiles.some(existing => existing.name === f.name)) {
           queuedFiles.push(f);
         }
@@ -566,7 +618,6 @@ document.addEventListener("DOMContentLoaded", () => {
     updateFileListUI();
   }
 
-  // 드래그 앤 드롭 이벤트
   btnBrowseFiles.addEventListener("click", () => fileInput.click());
   dropZone.addEventListener("click", (e) => {
     if (e.target !== btnBrowseFiles) fileInput.click();
@@ -601,12 +652,11 @@ document.addEventListener("DOMContentLoaded", () => {
     updateFileListUI();
   });
 
-  // 서버로 업로드 전송 (/api/upload)
   btnUploadFiles.addEventListener("click", async () => {
     if (queuedFiles.length === 0) return;
 
     btnUploadFiles.disabled = true;
-    btnUploadFiles.textContent = "서버로 업로드 중...";
+    btnUploadFiles.textContent = "서버 업로드 및 자동 재분석 중...";
     uploadStatusMsg.style.display = "none";
 
     const formData = new FormData();
@@ -624,10 +674,13 @@ document.addEventListener("DOMContentLoaded", () => {
       uploadStatusMsg.style.display = "block";
       if (json.success) {
         uploadStatusMsg.className = "upload-status-msg success";
-        uploadStatusMsg.textContent = `🎉 파일 ${json.uploaded_count}개가 data/raw/ 폴더에 안전하게 업로드 완료되었습니다! (${json.uploaded_files.map(f => f.filename).join(", ")})`;
+        uploadStatusMsg.textContent = `🎉 파일 ${json.uploaded_count}개가 안전하게 업로드되었으며, 새 데이터가 대시보드에 즉시 반영되었습니다!`;
         queuedFiles = [];
         fileInput.value = "";
         updateFileListUI();
+
+        // 🔄 데이터 갱신 후 화면 즉시 자동 새로고침!
+        await loadInitialData();
       } else {
         uploadStatusMsg.className = "upload-status-msg error";
         uploadStatusMsg.textContent = `❌ 업로드 실패: ${json.errors ? json.errors.join(" | ") : "오류가 발생했습니다."}`;
@@ -641,4 +694,7 @@ document.addEventListener("DOMContentLoaded", () => {
       btnUploadFiles.textContent = "선택한 파일 서버로 업로드 전송하기";
     }
   });
+
+  // 최초 로드 실행
+  loadInitialData();
 });

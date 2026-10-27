@@ -204,10 +204,22 @@ async def upload_multiple_files(files: List[UploadFile] = File(...)):
             "saved_path": saved_label
         })
 
+    # 5. 파일 업로드 후 자동 재분석 트리거 (신규 데이터셋 자동 정제 및 갱신)
+    pipeline_executed = False
+    try:
+        from preprocess import build_pir_dataset
+        build_pir_dataset()
+        pir_service._load_data()  # 메모리 캐시 갱신
+        pipeline_executed = True
+        logger.info("⚙️ 업로드된 새 파일을 반영하여 PIR 데이터 정제 파이프라인 자동 재실행 완료!")
+    except Exception as e:
+        logger.warning(f"업로드 후 자동 정제 파이프라인 건너뜀 (기본 데이터셋 유지): {e}")
+
     return {
         "success": len(uploaded_results) > 0,
         "uploaded_count": len(uploaded_results),
         "uploaded_files": uploaded_results,
+        "pipeline_executed": pipeline_executed,
         "errors": errors
     }
 
