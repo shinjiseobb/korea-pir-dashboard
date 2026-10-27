@@ -205,7 +205,8 @@ def compare_selected_regions(payload: RegionCompareRequest):
     }
 
 # 8. 정적 웹 파일 서빙 (Front-end)
-app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+if STATIC_DIR.exists():
+    app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 @app.get("/favicon.ico", include_in_schema=False)
 def get_favicon():
