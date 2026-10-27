@@ -35,7 +35,12 @@ class PIRService:
     """안전한 데이터 격리 로더 및 비즈니스 로직 서비스"""
 
     def __init__(self, dataset_path: Path = DATA_PROCESSED_FILE):
-        self.dataset_path = dataset_path.resolve()
+        resolved = dataset_path.resolve()
+        # Path Traversal 방어: 허용된 데이터 파일명 외의 임의 시스템 파일 접근 사전 차단
+        if resolved.name != "cleaned_pir_dataset.csv":
+            raise PermissionError("보안 위반: 허용되지 않은 파일 경로 접근입니다.")
+
+        self.dataset_path = resolved
         self._data: List[Dict[str, Any]] = []
         self._national_info: Optional[Dict[str, Any]] = None
         self._load_data()
