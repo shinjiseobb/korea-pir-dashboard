@@ -146,9 +146,10 @@ class RegionCompareRequest(BaseModel):
         description="비교할 지역명 목록 (1개 이상 10개 이하)"
     )
 
-# 7. API 엔드포인트 구현
+# 7. API 엔드포인트 구현 (Vercel 클라우드 라우팅 호환을 위한 이중 데코레이터 적용)
 
 @app.post("/api/upload", tags=["데이터 업로드"])
+@app.post("/upload", tags=["데이터 업로드"])
 async def upload_multiple_files(files: List[UploadFile] = File(...)):
     """
     여러 개의 원천 데이터 파일(CSV, Excel)을 안전하게 업로드하여 data/raw/ 에 격리 보관
@@ -211,6 +212,7 @@ async def upload_multiple_files(files: List[UploadFile] = File(...)):
     }
 
 @app.get("/api/health", tags=["시스템"])
+@app.get("/health", tags=["시스템"])
 def health_check():
     """서버 정상 작동 및 헬스체크"""
     return {
@@ -221,6 +223,7 @@ def health_check():
     }
 
 @app.get("/api/pir", tags=["PIR 지표"])
+@app.get("/pir", tags=["PIR 지표"])
 def get_all_pir(
     sort_by: str = Query("pir", description="정렬 기준: pir, housing_price_won, annual_income_won, rank"),
     ascending: bool = Query(False, description="오름차순 여부")
@@ -234,6 +237,7 @@ def get_all_pir(
     }
 
 @app.get("/api/search", tags=["지역 검색"])
+@app.get("/search", tags=["지역 검색"])
 def search_region(
     q: str = Query(..., min_length=1, max_length=20, description="검색할 지역 키워드")
 ):
@@ -247,6 +251,7 @@ def search_region(
     }
 
 @app.post("/api/filter", tags=["맞춤 필터링"])
+@app.post("/filter", tags=["맞춤 필터링"])
 def filter_by_user_budget(payload: BudgetFilterRequest):
     """사용자 연소득 및 예산 기준 진입 가능 지역 필터링"""
     filtered = pir_service.filter_by_budget(
@@ -263,6 +268,7 @@ def filter_by_user_budget(payload: BudgetFilterRequest):
     }
 
 @app.post("/api/compare", tags=["지역 비교"])
+@app.post("/compare", tags=["지역 비교"])
 def compare_selected_regions(payload: RegionCompareRequest):
     """선택 지역 간 다각도 비교 분석"""
     comparison = pir_service.compare_regions(region_names=payload.regions)
