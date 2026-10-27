@@ -25,6 +25,7 @@ from pydantic import BaseModel, Field
 
 # tools.py 의 핵심 로직 import
 from tools import pir_service
+from gemini_agent import run_gemini_agent
 
 # 콘솔 한글 인코딩 보장
 if sys.stdout and hasattr(sys.stdout, "reconfigure"):
@@ -144,6 +145,22 @@ class RegionCompareRequest(BaseModel):
         min_length=1,
         max_length=10,
         description="비교할 지역명 목록 (1개 이상 10개 이하)"
+    )
+
+class GeminiAskRequest(BaseModel):
+    question: str = Field(
+        ...,
+        min_length=2,
+        max_length=500,
+        description="사용자의 자연어 질문"
+    )
+    api_key: Optional[str] = Field(
+        None,
+        description="Gemini API Key (생략 시 .env 의 GEMINI_API_KEY 사용)"
+    )
+    model: Optional[str] = Field(
+        "gemini-1.5-flash",
+        description="사용할 Gemini 모델명 (예: gemini-1.5-flash, gemini-1.5-pro, gemini-2.0-flash)"
     )
 
 # 7. API 엔드포인트 구현 (Vercel 클라우드 라우팅 호환을 위한 이중 데코레이터 적용)
@@ -293,6 +310,41 @@ def compare_selected_regions(payload: RegionCompareRequest):
         "success": True,
         "data": comparison
     }
+
+@app.post("/api/ai/ask", tags=["AI 분석 비서"])
+@app.post("/ai/ask", tags=["AI 분석 비서"])
+def ask_gemini_agent(payload: GeminiAskRequest):
+    """
+    제미나이 3단계 데이터 분석 에이전트
+    1단계: 의도 파악 -> 2단계: 파이썬 정밀 연산 -> 3단계: 최종 해설 보고서 생성
+    """
+    # API 키 확인: 요청 본문의 키 우선, 없으면 .env의 GEMINI_API_KEY 사용
+    api_key = payload.api_key or os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={
+                "success": False,
+                "message": "Gemini API Key가 제공되지 않았습니다. 화면의 API Key 입력란에 키를 입력하거나 .env 파일에 GEMINI_API_KEY를 등록해 주세요."
+            }
+        )
+
+    try:
+        agent_result = run_gemini_agent(
+            user_question=payload.question,
+            api_key=api_key,
+            model=payload.model or "gemini-1.5-flash"
+        )
+        return agent_result
+    except Exception as e:
+        logger.error(f"AI 에이전트 실행 실패: {e}")
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={
+                "success": False,
+                "message": f"AI 분석 처리 중 오류가 발생했습니다: {str(e)}"
+            }
+        )
 
 # 8. 정적 웹 파일 서빙 (Front-end)
 if STATIC_DIR.exists():

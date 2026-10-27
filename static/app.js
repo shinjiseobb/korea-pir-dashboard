@@ -697,4 +697,132 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // 최초 로드 실행
   loadInitialData();
+
+  // 12. Gemini AI 지능형 분석 에이전트 로직
+  const geminiApiKeyInput = document.getElementById("geminiApiKeyInput");
+  const geminiModelSelect = document.getElementById("geminiModelSelect");
+  const geminiCustomModelInput = document.getElementById("geminiCustomModelInput");
+  const aiQuestionInput = document.getElementById("aiQuestionInput");
+  const btnAskAi = document.getElementById("btnAskAi");
+  const aiResponseContainer = document.getElementById("aiResponseContainer");
+  const aiStep1Text = document.getElementById("aiStep1Text");
+  const aiStep2Data = document.getElementById("aiStep2Data");
+  const aiFinalReportContent = document.getElementById("aiFinalReportContent");
+  const promptChips = document.querySelectorAll(".prompt-chip");
+
+  // 저장된 API Key 불러오기 (사용자 편의)
+  const savedApiKey = localStorage.getItem("korea_pir_gemini_api_key");
+  if (savedApiKey) {
+    geminiApiKeyInput.value = savedApiKey;
+  }
+
+  // API Key 변경 시 로컬스토리지 자동 저장
+  geminiApiKeyInput.addEventListener("input", (e) => {
+    localStorage.setItem("korea_pir_gemini_api_key", e.target.value.trim());
+  });
+
+  // 모델 직접 입력 토글
+  geminiModelSelect.addEventListener("change", () => {
+    if (geminiModelSelect.value === "custom") {
+      geminiCustomModelInput.style.display = "block";
+      geminiCustomModelInput.focus();
+    } else {
+      geminiCustomModelInput.style.display = "none";
+    }
+  });
+
+  // 추천 질문 칩 클릭
+  promptChips.forEach(chip => {
+    chip.addEventListener("click", () => {
+      aiQuestionInput.value = chip.dataset.question;
+      aiQuestionInput.focus();
+    });
+  });
+
+  // AI 분석 요청 실행
+  btnAskAi.addEventListener("click", async () => {
+    const question = aiQuestionInput.value.trim();
+    if (!question) {
+      alert("질문을 입력해 주세요!");
+      aiQuestionInput.focus();
+      return;
+    }
+
+    const apiKey = geminiApiKeyInput.value.trim();
+    if (!apiKey) {
+      alert("Google Gemini API Key를 입력해 주세요!\n(Google AI Studio에서 무료로 발급받으실 수 있습니다.)");
+      geminiApiKeyInput.focus();
+      return;
+    }
+
+    // 선택된 모델 결정
+    let chosenModel = geminiModelSelect.value;
+    if (chosenModel === "custom") {
+      chosenModel = geminiCustomModelInput.value.trim() || "gemini-1.5-flash";
+    }
+
+    // UI 상태: 로딩 시작
+    btnAskAi.disabled = true;
+    btnAskAi.textContent = "🤖 3단계 분석 진행 중...";
+    aiResponseContainer.style.display = "flex";
+
+    aiStep1Text.textContent = "1단계: 제미나이가 질문의 의도를 분석 중입니다...";
+    aiStep2Data.textContent = "파이썬 tools.py 정밀 연산 대기 중...";
+    while (aiFinalReportContent.firstChild) {
+      aiFinalReportContent.removeChild(aiFinalReportContent.firstChild);
+    }
+    const loadingP = document.createElement("p");
+    loadingP.textContent = "제미나이가 팩트 데이터를 바탕으로 전문 종합 보고서를 작성하고 있습니다. 잠시만 기다려 주세요...";
+    loadingP.style.color = "#059669";
+    aiFinalReportContent.appendChild(loadingP);
+
+    try {
+      const res = await fetch("/api/ai/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          question: question,
+          api_key: apiKey,
+          model: chosenModel
+        })
+      });
+
+      const json = await res.json();
+
+      if (json.success) {
+        // [1단계 렌더링]: 파악된 의도 및 실행 도구
+        aiStep1Text.textContent = `의도 파악 완료: "${json.user_intent}" (실행 도구: ${json.tool_used}, 사용 모델: ${json.model_used})`;
+
+        // [2단계 렌더링]: 파이썬 계산 팩트 데이터
+        aiStep2Data.textContent = JSON.stringify(json.raw_data, null, 2);
+
+        // [3단계 렌더링]: 제미나이 최종 해설 보고서 (안전한 textContent)
+        while (aiFinalReportContent.firstChild) {
+          aiFinalReportContent.removeChild(aiFinalReportContent.firstChild);
+        }
+        const reportDiv = document.createElement("div");
+        reportDiv.textContent = json.final_answer;
+        aiFinalReportContent.appendChild(reportDiv);
+      } else {
+        while (aiFinalReportContent.firstChild) {
+          aiFinalReportContent.removeChild(aiFinalReportContent.firstChild);
+        }
+        const errorP = document.createElement("p");
+        errorP.style.color = "var(--danger)";
+        errorP.textContent = `❌ 분석 실패: ${json.message || "오류가 발생했습니다."}`;
+        aiFinalReportContent.appendChild(errorP);
+      }
+    } catch (err) {
+      while (aiFinalReportContent.firstChild) {
+        aiFinalReportContent.removeChild(aiFinalReportContent.firstChild);
+      }
+      const errP = document.createElement("p");
+      errP.style.color = "var(--danger)";
+      errP.textContent = `❌ 네트워크 오류: ${err.message}`;
+      aiFinalReportContent.appendChild(errP);
+    } finally {
+      btnAskAi.disabled = false;
+      btnAskAi.textContent = "분석 요청하기";
+    }
+  });
 });

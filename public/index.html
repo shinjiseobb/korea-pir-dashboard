@@ -27,6 +27,81 @@
 
   <!-- 메인 레이아웃 -->
   <main class="main-container">
+
+    <!-- 🤖 Gemini AI 지능형 분석 에이전트 섹션 -->
+    <section class="card ai-agent-section">
+      <div class="ai-header">
+        <div class="ai-title-area">
+          <span class="ai-badge">✨ 3단계 에이전트 시스템</span>
+          <h2>🤖 Gemini AI 부동산 지능형 분석 비서</h2>
+          <p class="section-desc">제미나이가 의도를 파악하고 ➔ 파이썬이 정확한 숫자를 계산한 뒤 ➔ 제미나이가 전문 해설 보고서를 작성합니다.</p>
+        </div>
+      </div>
+
+      <!-- 모델 및 API Key 설정 바 -->
+      <div class="ai-config-bar">
+        <div class="config-item api-key-field">
+          <label for="geminiApiKeyInput">🔑 Gemini API Key</label>
+          <input type="password" id="geminiApiKeyInput" placeholder="Google AI Studio에서 발급받은 키(AIzaSy...)를 입력하세요">
+        </div>
+        <div class="config-item model-select-field">
+          <label for="geminiModelSelect">🤖 사용할 모델 (직접 선택/입력)</label>
+          <div class="model-input-wrapper">
+            <select id="geminiModelSelect">
+              <option value="gemini-1.5-flash" selected>gemini-1.5-flash (빠르고 경제적)</option>
+              <option value="gemini-1.5-pro">gemini-1.5-pro (심층 분석 전문가)</option>
+              <option value="gemini-2.0-flash">gemini-2.0-flash (최신 고성능)</option>
+              <option value="custom">직접 모델명 입력...</option>
+            </select>
+            <input type="text" id="geminiCustomModelInput" placeholder="모델명 직접 입력 (예: gemini-2.5-pro)" style="display: none;">
+          </div>
+        </div>
+      </div>
+
+      <!-- 자연어 질문 입력 폼 -->
+      <div class="ai-input-box">
+        <textarea id="aiQuestionInput" rows="2" placeholder="자연어로 편하게 물어보세요! (예: '내 연봉이 6천만 원인데 서울에서 살 만한 권역이 있어?', '경기도와 부산의 집값 및 PIR 차이를 비교해줘')"></textarea>
+        <button type="button" class="btn btn-primary" id="btnAskAi">분석 요청하기</button>
+      </div>
+
+      <!-- 추천 질문 칩 -->
+      <div class="ai-prompt-chips">
+        <span class="chip-hint">💡 추천 질문:</span>
+        <button type="button" class="prompt-chip" data-question="내 연봉 5,000만 원 기준으로 전국에서 부담 없이 살 수 있는 지역 추천해줘">"연봉 5천만 원 진입 가능 지역은?"</button>
+        <button type="button" class="prompt-chip" data-question="서울 동남권과 서울 도심권의 주택가격과 PIR 차이를 비교 분석해줘">"서울 동남권 vs 도심권 비교"</button>
+        <button type="button" class="prompt-chip" data-question="전국에서 소득 대비 집값이 가장 비싼 상위 3개 지역의 PIR 현황 알려줘">"전국 최고 PIR 3곳 분석"</button>
+      </div>
+
+      <!-- 3단계 분석 진행 상태 & 최종 결과 출력 영역 -->
+      <div id="aiResponseContainer" class="ai-response-container" style="display: none;">
+        <!-- 1단계: 의도 분석 뱃지 -->
+        <div class="ai-step-badge" id="aiStep1Badge">
+          <span class="step-num">Step 1</span>
+          <span class="step-text" id="aiStep1Text">제미나이 의도 파악 중...</span>
+        </div>
+
+        <!-- 2단계: 파이썬 정밀 계산 팩트 카드 -->
+        <div class="ai-step-card" id="aiStep2Card">
+          <div class="step-card-header">
+            <span class="step-num">Step 2</span>
+            <strong>파이썬(tools.py) 정밀 계산 팩트 데이터</strong>
+          </div>
+          <pre id="aiStep2Data" class="data-preview-code"></pre>
+        </div>
+
+        <!-- 3단계: 제미나이 최종 해설 리포트 -->
+        <div class="ai-final-report" id="aiStep3Report">
+          <div class="report-header">
+            <span class="step-num">Step 3</span>
+            <h3>📊 Gemini AI 최종 종합 분석 리포트</h3>
+          </div>
+          <div id="aiFinalReportContent" class="report-body">
+            <!-- 안전한 DOM 바인딩으로 출력 -->
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- 1. 핵심 요약 카드 그리드 -->
     <section class="summary-grid" id="summarySection">
       <div class="card stat-card">
