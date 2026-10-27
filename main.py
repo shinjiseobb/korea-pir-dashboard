@@ -18,7 +18,7 @@ from typing import List, Optional
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request, status, Query
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import JSONResponse, FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
@@ -221,7 +221,8 @@ def serve_index():
     """웹 앱 홈 화면 (static/index.html) 제공"""
     index_file = STATIC_DIR / "index.html"
     if index_file.exists():
-        return FileResponse(index_file)
+        content = index_file.read_text(encoding="utf-8")
+        return HTMLResponse(content=content)
     return {
         "message": "PIR 대시보드 API 서버가 정상 실행 중입니다. 프론트엔드 파일(static/index.html)이 생성되면 화면이 표시됩니다.",
         "api_docs": "/docs"
