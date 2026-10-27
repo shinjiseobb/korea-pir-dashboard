@@ -155,11 +155,11 @@ body {
 }
 
 .ai-config-bar {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
   background: #ffffff;
-  padding: 1rem;
+  padding: 0.85rem 1.15rem;
   border-radius: var(--radius-md);
   border: 1px solid var(--border);
 }

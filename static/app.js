@@ -698,8 +698,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // 최초 로드 실행
   loadInitialData();
 
-  // 12. Gemini AI 지능형 분석 에이전트 로직
-  const geminiApiKeyInput = document.getElementById("geminiApiKeyInput");
+  // 12. Gemini AI 지능형 분석 에이전트 로직 (API 키는 서버 환경변수 자동 연동)
   const geminiModelSelect = document.getElementById("geminiModelSelect");
   const geminiCustomModelInput = document.getElementById("geminiCustomModelInput");
   const aiQuestionInput = document.getElementById("aiQuestionInput");
@@ -709,17 +708,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const aiStep2Data = document.getElementById("aiStep2Data");
   const aiFinalReportContent = document.getElementById("aiFinalReportContent");
   const promptChips = document.querySelectorAll(".prompt-chip");
-
-  // 저장된 API Key 불러오기 (사용자 편의)
-  const savedApiKey = localStorage.getItem("korea_pir_gemini_api_key");
-  if (savedApiKey) {
-    geminiApiKeyInput.value = savedApiKey;
-  }
-
-  // API Key 변경 시 로컬스토리지 자동 저장
-  geminiApiKeyInput.addEventListener("input", (e) => {
-    localStorage.setItem("korea_pir_gemini_api_key", e.target.value.trim());
-  });
 
   // 모델 직접 입력 토글
   geminiModelSelect.addEventListener("change", () => {
@@ -745,13 +733,6 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!question) {
       alert("질문을 입력해 주세요!");
       aiQuestionInput.focus();
-      return;
-    }
-
-    const apiKey = geminiApiKeyInput.value.trim();
-    if (!apiKey) {
-      alert("Google Gemini API Key를 입력해 주세요!\n(Google AI Studio에서 무료로 발급받으실 수 있습니다.)");
-      geminiApiKeyInput.focus();
       return;
     }
 
@@ -782,7 +763,6 @@ document.addEventListener("DOMContentLoaded", () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           question: question,
-          api_key: apiKey,
           model: chosenModel
         })
       });
