@@ -13,14 +13,11 @@ env/
 .env
 *.local.env
 
-# 원천 데이터 및 정제 데이터 (대용량/개인정보 보호 차원)
-data/raw/*
-!data/raw/.gitkeep
+# 격리 데이터 무시
 data/quarantine/*
 !data/quarantine/.gitkeep
 data/processed/*
 !data/processed/.gitkeep
-# Vercel 배포를 위한 최종 정제 데이터셋은 포함
 !data/processed/cleaned_pir_dataset.csv
 
 # 로그 파일 무시
