@@ -698,9 +698,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // 최초 로드 실행
   loadInitialData();
 
-  // 12. Gemini AI 지능형 분석 에이전트 로직 (API 키는 서버 환경변수 자동 연동)
-  const geminiModelSelect = document.getElementById("geminiModelSelect");
-  const geminiCustomModelInput = document.getElementById("geminiCustomModelInput");
+  // 12. Gemini AI 지능형 분석 에이전트 로직 (모델: gemini-3.5-flash-lite 고정)
   const aiQuestionInput = document.getElementById("aiQuestionInput");
   const btnAskAi = document.getElementById("btnAskAi");
   const aiResponseContainer = document.getElementById("aiResponseContainer");
@@ -708,16 +706,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const aiStep2Data = document.getElementById("aiStep2Data");
   const aiFinalReportContent = document.getElementById("aiFinalReportContent");
   const promptChips = document.querySelectorAll(".prompt-chip");
-
-  // 모델 직접 입력 토글
-  geminiModelSelect.addEventListener("change", () => {
-    if (geminiModelSelect.value === "custom") {
-      geminiCustomModelInput.style.display = "block";
-      geminiCustomModelInput.focus();
-    } else {
-      geminiCustomModelInput.style.display = "none";
-    }
-  });
 
   // 추천 질문 칩 클릭
   promptChips.forEach(chip => {
@@ -736,15 +724,11 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    // 선택된 모델 결정
-    let chosenModel = geminiModelSelect.value;
-    if (chosenModel === "custom") {
-      chosenModel = geminiCustomModelInput.value.trim() || "gemini-1.5-flash";
-    }
+    const chosenModel = "gemini-3.5-flash-lite";
 
     // UI 상태: 로딩 시작
     btnAskAi.disabled = true;
-    btnAskAi.textContent = "🤖 3단계 분석 진행 중...";
+    btnAskAi.textContent = "🤖 3단계 분석 진행 중 (gemini-3.5-flash-lite)...";
     aiResponseContainer.style.display = "flex";
 
     aiStep1Text.textContent = "1단계: 제미나이가 질문의 의도를 분석 중입니다...";

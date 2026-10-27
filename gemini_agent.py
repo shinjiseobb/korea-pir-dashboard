@@ -97,7 +97,7 @@ def call_gemini_api(api_key: str, model: str, prompt: str, system_instruction: O
         logger.error(f"Gemini API 호출 실패: {e}")
         raise RuntimeError(f"Gemini 연결 실패: {e}")
 
-def run_gemini_agent(user_question: str, api_key: str, model: str = "gemini-1.5-flash") -> Dict[str, Any]:
+def run_gemini_agent(user_question: str, api_key: str, model: str = "gemini-3.5-flash-lite") -> Dict[str, Any]:
     """
     3단계 파이프라인 실행:
     1단계: 의도 분석 및 도구 선택
@@ -108,7 +108,7 @@ def run_gemini_agent(user_question: str, api_key: str, model: str = "gemini-1.5-
         raise ValueError("Gemini API Key가 제공되지 않았습니다.")
     
     clean_key = api_key.strip()
-    clean_model = model.strip() if model else "gemini-1.5-flash"
+    clean_model = model.strip() if model else "gemini-3.5-flash-lite"
 
     # [1단계: 의도 파악] 제미나이에게 어떤 도구를 실행할지 JSON으로 요청
     step1_system = f"""당신은 부동산 데이터 분석 에이전트의 '의도 파악 라우터'입니다.

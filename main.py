@@ -159,8 +159,8 @@ class GeminiAskRequest(BaseModel):
         description="Gemini API Key (생략 시 .env 의 GEMINI_API_KEY 사용)"
     )
     model: Optional[str] = Field(
-        "gemini-1.5-flash",
-        description="사용할 Gemini 모델명 (예: gemini-1.5-flash, gemini-1.5-pro, gemini-2.0-flash)"
+        "gemini-3.5-flash-lite",
+        description="Gemini 모델명 (기본: gemini-3.5-flash-lite)"
     )
 
 # 7. API 엔드포인트 구현 (Vercel 클라우드 라우팅 호환을 위한 이중 데코레이터 적용)
@@ -333,7 +333,7 @@ def ask_gemini_agent(payload: GeminiAskRequest):
         agent_result = run_gemini_agent(
             user_question=payload.question,
             api_key=api_key,
-            model=payload.model or "gemini-1.5-flash"
+            model=payload.model or "gemini-3.5-flash-lite"
         )
         return agent_result
     except Exception as e:
